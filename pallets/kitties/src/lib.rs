@@ -89,8 +89,13 @@ pub mod pallet {
 
 	#[pallet::storage]
 	#[pallet::getter(fn owner)]
-	pub(super) type Owner<T: Config> =
-		StorageMap<_, Blake2_128Concat, T::AccountId, Vec<Vec<u8>>, OptionQuery>;
+	pub(super) type Owner<T: Config> = StorageMap<
+		_,
+		Blake2_128Concat,
+		T::AccountId,
+		BoundedVec<Vec<u8>, T::KittiesLimit>,
+		OptionQuery,
+	>;
 
 	#[pallet::storage]
 	#[pallet::getter(fn limit_kitties)]
@@ -122,11 +127,15 @@ pub mod pallet {
 
 		KittyNotOwned,
 
+		NoKitty,
+
 		InvalidAccount,
 
 		Overflow,
 
 		ExceedLimit,
+
+		DuplicateKitty,
 	}
 
 	// Dispatchable functions allows users to interact with the pallet and invoke state changes.
@@ -144,11 +153,12 @@ pub mod pallet {
 
 			let who = ensure_signed(origin)?;
 
-			let kitties_owned = Owner::<T>::get(&who).unwrap_or_default();
+			let mut kitties_owned = Owner::<T>::get(&who).unwrap_or_default();
 
-			let limit = LimitKitties::<T>::get();
-
-			ensure!((kitties_owned.len() as u32) < limit, Error::<T>::ExceedLimit);
+			ensure!(
+				((kitties_owned.clone()).len() as u32) < LimitKitties::<T>::get(),
+				Error::<T>::ExceedLimit
+			);
 
 			log::info!("Total balance: {:?}", T::Currency::total_balance(&who));
 
@@ -164,27 +174,37 @@ pub mod pallet {
 				created_date: T::Time::now(),
 			};
 
+			ensure!(!Kitties::<T>::contains_key(&kitty.dna), Error::<T>::DuplicateKitty);
+
+			// let mut vec_kitties = <Owner<T>>::get(who.clone());
+
+			// Store kitty into owner's list
+			// match <Owner<T>>::get(who.clone()) {
+			// 	Some(mut x) => {
+			// 		x.push(dna.clone());
+			// 		<Owner<T>>::insert(who, x);
+			// 	},
+			// 	None => {
+			// 		let mut vec_kitties = Vec::new();
+			// 		vec_kitties.push(dna.clone());
+			// 		<Owner<T>>::insert(who, vec_kitties);
+			// 	},
+			// }
+
+			kitties_owned.try_push(kitty.dna.clone()).map_err(|_| Error::<T>::NoKitty)?;
+			Owner::<T>::insert(&who, kitties_owned);
+
+			// Store information of kitty
+
+			<Kitties<T>>::insert(dna.clone(), kitty);
+
+			// Update number of kitties
+
 			let mut current_id = <NumberKitties<T>>::get();
 
 			current_id += 1;
 
 			<NumberKitties<T>>::put(current_id);
-
-			<Kitties<T>>::insert(dna.clone(), kitty);
-
-			// let mut vec_kitties = <Owner<T>>::get(who.clone());
-
-			match <Owner<T>>::get(who.clone()) {
-				Some(mut x) => {
-					x.push(dna.clone());
-					<Owner<T>>::insert(who, x);
-				},
-				None => {
-					let mut vec_kitties = Vec::new();
-					vec_kitties.push(dna.clone());
-					<Owner<T>>::insert(who, vec_kitties);
-				},
-			}
 
 			// Emit an event.
 			Self::deposit_event(Event::KittyStored(dna));
@@ -209,12 +229,19 @@ pub mod pallet {
 			// Check ownership of kitty
 			ensure!(sender_kitties.contains(&dna), Error::<T>::KittyNotOwned);
 			// Get kitties of receiver
-			let mut receiver_kitties = <Owner<T>>::get(account.clone()).unwrap_or(Vec::new());
+			let mut receiver_kitties = <Owner<T>>::get(account.clone()).unwrap_or_default();
+
+			ensure!(
+				((receiver_kitties.clone()).len() as u32) < LimitKitties::<T>::get(),
+				Error::<T>::ExceedLimit
+			);
+
 			// Transfer kitty from sender to receiver
+			receiver_kitties.try_push(dna.clone()).map_err(|_| Error::<T>::ExceedLimit)?;
 			sender_kitties.retain(|x| x != &dna);
-			receiver_kitties.push(dna.clone());
 			<Owner<T>>::insert(who, sender_kitties);
 			<Owner<T>>::insert(account.clone(), receiver_kitties);
+
 			// Update information of kitty
 			let mut kitty_update = <Kitties<T>>::get(dna.clone()).unwrap();
 			kitty_update.owner = account.clone();

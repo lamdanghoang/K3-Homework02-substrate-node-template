@@ -286,7 +286,7 @@ parameter_types! {
 }
 
 parameter_types! {
-	pub const KittiesLimit: u32 = 1;
+	pub const KittiesLimit: u32 = 1000;
 }
 
 /// Configure the pallet-kitties in pallets/kitties.
