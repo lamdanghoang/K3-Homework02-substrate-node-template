@@ -52,6 +52,10 @@ pub use pallet_demo;
 /// Import the kitties pallet.
 pub use pallet_kitties;
 
+pub use pallet_loosely_coupling;
+
+pub use pallet_tightly_coupling;
+
 /// An index to a block.
 pub type BlockNumber = u32;
 
@@ -276,9 +280,30 @@ impl pallet_demo::Config for Runtime {
 	type Event = Event;
 }
 
+parameter_types! {
+	pub const MaxAddend: u32 = 1738;
+	pub const ClearFrequency: u32 = 10;
+}
+
+parameter_types! {
+	pub const KittiesLimit: u32 = 1;
+}
+
 /// Configure the pallet-kitties in pallets/kitties.
 impl pallet_kitties::Config for Runtime {
 	type Event = Event;
+	type Currency = Balances;
+	type Time = Timestamp;
+	type KittiesLimit = KittiesLimit;
+}
+
+impl pallet_tightly_coupling::Config for Runtime {
+	type Event = Event;
+}
+
+impl pallet_loosely_coupling::Config for Runtime {
+	type Event = Event;
+	type Increase = TemplateModule;
 }
 
 // Create the runtime by composing the FRAME pallets that were previously configured.
@@ -300,6 +325,8 @@ construct_runtime!(
 		TemplateModule: pallet_template,
 		Demo: pallet_demo,
 		Kitties: pallet_kitties,
+		Tightly: pallet_tightly_coupling,
+		Loosely: pallet_loosely_coupling,
 	}
 );
 

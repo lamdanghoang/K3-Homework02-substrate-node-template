@@ -16,10 +16,19 @@ pub use pallet::*;
 
 use frame_support::inherent::Vec;
 use frame_support::pallet_prelude::*;
+use frame_support::traits::Currency;
+use frame_support::traits::Get;
+use frame_support::traits::Time;
 use frame_system::pallet_prelude::*;
+
+type BalanceOf<T> =
+	<<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
+
+type TimeStamp<T> = <<T as Config>::Time as Time>::Moment;
 
 #[frame_support::pallet]
 pub mod pallet {
+
 	use super::*;
 
 	#[derive(TypeInfo, Default, Decode, Encode)]
@@ -27,8 +36,9 @@ pub mod pallet {
 	pub struct Kitty<T: Config> {
 		dna: Vec<u8>,
 		owner: T::AccountId,
-		price: u32,
+		price: BalanceOf<T>,
 		gender: Gender,
+		created_date: TimeStamp<T>,
 	}
 
 	pub type Id = u32;
@@ -50,6 +60,13 @@ pub mod pallet {
 	pub trait Config: frame_system::Config {
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
 		type Event: From<Event<Self>> + IsType<<Self as frame_system::Config>::Event>;
+
+		type Currency: Currency<Self::AccountId>;
+
+		type Time: Time;
+
+		#[pallet::constant]
+		type KittiesLimit: Get<u32>;
 	}
 
 	#[pallet::pallet]
@@ -75,6 +92,12 @@ pub mod pallet {
 	pub(super) type Owner<T: Config> =
 		StorageMap<_, Blake2_128Concat, T::AccountId, Vec<Vec<u8>>, OptionQuery>;
 
+	#[pallet::storage]
+	#[pallet::getter(fn limit_kitties)]
+	// Learn more about declaring storage items:
+	// https://docs.substrate.io/v3/runtime/storage#declaring-storage-items
+	pub type LimitKitties<T: Config> = StorageValue<_, u32, ValueQuery>;
+
 	// Pallets use events to inform users when important changes are made.
 	// https://docs.substrate.io/v3/runtime/events-and-errors
 	#[pallet::event]
@@ -82,9 +105,11 @@ pub mod pallet {
 	pub enum Event<T: Config> {
 		/// Event documentation should end with an array that provides descriptive names for event
 		/// parameters.
-		KittyStored(Vec<u8>, u32),
+		KittyStored(Vec<u8>),
 
 		KittyTransferedTo(T::AccountId, Vec<u8>),
+
+		KittiesLimitSet(u32),
 	}
 
 	// Errors inform users that something went wrong.
@@ -98,6 +123,10 @@ pub mod pallet {
 		KittyNotOwned,
 
 		InvalidAccount,
+
+		Overflow,
+
+		ExceedLimit,
 	}
 
 	// Dispatchable functions allows users to interact with the pallet and invoke state changes.
@@ -108,17 +137,32 @@ pub mod pallet {
 		/// An example dispatchable that takes a singles value as a parameter, writes the value to
 		/// storage and emits an event. This function must be dispatched by a signed extrinsic.
 		#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
-		pub fn create_kitty(origin: OriginFor<T>, dna: Vec<u8>, price: u32) -> DispatchResult {
+		pub fn create_kitty(origin: OriginFor<T>, dna: Vec<u8>) -> DispatchResult {
 			// Check that the extrinsic was signed and get the signer.
 			// This function will return an error if the extrinsic is not signed.
 			// https://docs.substrate.io/v3/runtime/origins
+
 			let who = ensure_signed(origin)?;
 
-			ensure!(price > 0, Error::<T>::InvalidPrice);
+			let kitties_owned = Owner::<T>::get(&who).unwrap_or_default();
+
+			let limit = LimitKitties::<T>::get();
+
+			ensure!((kitties_owned.len() as u32) < limit, Error::<T>::ExceedLimit);
+
+			log::info!("Total balance: {:?}", T::Currency::total_balance(&who));
 
 			let gender = Self::get_gender(dna.clone())?;
 
-			let kitty = Kitty::<T> { dna: dna.clone(), owner: who.clone(), price, gender };
+			log::info!("Created time {:?}", T::Time::now());
+
+			let kitty = Kitty::<T> {
+				dna: dna.clone(),
+				owner: who.clone(),
+				price: 0u32.into(),
+				gender,
+				created_date: T::Time::now(),
+			};
 
 			let mut current_id = <NumberKitties<T>>::get();
 
@@ -143,7 +187,7 @@ pub mod pallet {
 			}
 
 			// Emit an event.
-			Self::deposit_event(Event::KittyStored(dna, price));
+			Self::deposit_event(Event::KittyStored(dna));
 			// Return a successful DispatchResultWithPostInfo
 			Ok(())
 		}
@@ -178,6 +222,21 @@ pub mod pallet {
 
 			// Emit an event.
 			Self::deposit_event(Event::KittyTransferedTo(account, dna));
+			// Return a successful DispatchResultWithPostInfo
+			Ok(())
+		}
+
+		#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
+		pub fn set_limit(origin: OriginFor<T>, limit: u32) -> DispatchResult {
+			// Check that the extrinsic was signed and get the signer.
+			// This function will return an error if the extrinsic is not signed.
+			// https://docs.substrate.io/v3/runtime/origins
+			let _ = ensure_signed(origin)?;
+
+			// Update storage.
+			<LimitKitties<T>>::put(limit);
+			// Emit an event.
+			Self::deposit_event(Event::KittiesLimitSet(limit));
 			// Return a successful DispatchResultWithPostInfo
 			Ok(())
 		}
