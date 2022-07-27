@@ -5,15 +5,16 @@
 /// <https://docs.substrate.io/v3/runtime/frame>
 pub use pallet::*;
 
-// #[cfg(test)]
-// mod mock;
+#[cfg(test)]
+mod mock;
 
-// #[cfg(test)]
-// mod tests;
+#[cfg(test)]
+mod tests;
 
-// #[cfg(feature = "runtime-benchmarks")]
-// mod benchmarking;
+#[cfg(feature = "runtime-benchmarks")]
+mod benchmarking;
 
+use frame_support::dispatch::fmt;
 use frame_support::inherent::Vec;
 use frame_support::pallet_prelude::*;
 use frame_support::traits::Currency;
@@ -41,9 +42,21 @@ pub mod pallet {
 		created_date: TimeStamp<T>,
 	}
 
+	impl<T: Config> fmt::Debug for Kitty<T> {
+		fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+			f.debug_struct("Kitty")
+				.field("dna", &self.dna)
+				.field("owner", &self.owner)
+				.field("price", &self.price)
+				.field("gender", &self.gender)
+				.field("created_date", &self.created_date)
+				.finish()
+		}
+	}
+
 	pub type Id = u32;
 
-	#[derive(TypeInfo, Decode, Encode)]
+	#[derive(TypeInfo, Decode, Encode, Debug)]
 	pub enum Gender {
 		Male,
 		Female,
@@ -97,11 +110,11 @@ pub mod pallet {
 		OptionQuery,
 	>;
 
-	#[pallet::storage]
-	#[pallet::getter(fn limit_kitties)]
-	// Learn more about declaring storage items:
-	// https://docs.substrate.io/v3/runtime/storage#declaring-storage-items
-	pub type LimitKitties<T: Config> = StorageValue<_, u32, ValueQuery>;
+	// #[pallet::storage]
+	// #[pallet::getter(fn limit_kitties)]
+	// // Learn more about declaring storage items:
+	// // https://docs.substrate.io/v3/runtime/storage#declaring-storage-items
+	// pub type LimitKitties<T: Config> = StorageValue<_, u32, ValueQuery>;
 
 	// Pallets use events to inform users when important changes are made.
 	// https://docs.substrate.io/v3/runtime/events-and-errors
@@ -145,7 +158,7 @@ pub mod pallet {
 	impl<T: Config> Pallet<T> {
 		/// An example dispatchable that takes a singles value as a parameter, writes the value to
 		/// storage and emits an event. This function must be dispatched by a signed extrinsic.
-		#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
+		#[pallet::weight(29_336_000 + T::DbWeight::get().reads_writes(4, 3))]
 		pub fn create_kitty(origin: OriginFor<T>, dna: Vec<u8>) -> DispatchResult {
 			// Check that the extrinsic was signed and get the signer.
 			// This function will return an error if the extrinsic is not signed.
@@ -156,7 +169,7 @@ pub mod pallet {
 			let mut kitties_owned = Owner::<T>::get(&who).unwrap_or_default();
 
 			ensure!(
-				((kitties_owned.clone()).len() as u32) < LimitKitties::<T>::get(),
+				((kitties_owned.clone()).len() as u32) < T::KittiesLimit::get(),
 				Error::<T>::ExceedLimit
 			);
 
@@ -175,6 +188,8 @@ pub mod pallet {
 			};
 
 			ensure!(!Kitties::<T>::contains_key(&kitty.dna), Error::<T>::DuplicateKitty);
+
+			log::info!("Kitty: {:?}", kitty);
 
 			// let mut vec_kitties = <Owner<T>>::get(who.clone());
 
@@ -232,7 +247,7 @@ pub mod pallet {
 			let mut receiver_kitties = <Owner<T>>::get(account.clone()).unwrap_or_default();
 
 			ensure!(
-				((receiver_kitties.clone()).len() as u32) < LimitKitties::<T>::get(),
+				((receiver_kitties.clone()).len() as u32) < T::KittiesLimit::get(),
 				Error::<T>::ExceedLimit
 			);
 
@@ -253,20 +268,20 @@ pub mod pallet {
 			Ok(())
 		}
 
-		#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
-		pub fn set_limit(origin: OriginFor<T>, limit: u32) -> DispatchResult {
-			// Check that the extrinsic was signed and get the signer.
-			// This function will return an error if the extrinsic is not signed.
-			// https://docs.substrate.io/v3/runtime/origins
-			let _ = ensure_signed(origin)?;
+		// #[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
+		// pub fn set_limit(origin: OriginFor<T>, limit: u32) -> DispatchResult {
+		// 	// Check that the extrinsic was signed and get the signer.
+		// 	// This function will return an error if the extrinsic is not signed.
+		// 	// https://docs.substrate.io/v3/runtime/origins
+		// 	let _ = ensure_signed(origin)?;
 
-			// Update storage.
-			<LimitKitties<T>>::put(limit);
-			// Emit an event.
-			Self::deposit_event(Event::KittiesLimitSet(limit));
-			// Return a successful DispatchResultWithPostInfo
-			Ok(())
-		}
+		// 	// Update storage.
+		// 	<LimitKitties<T>>::put(limit);
+		// 	// Emit an event.
+		// 	Self::deposit_event(Event::KittiesLimitSet(limit));
+		// 	// Return a successful DispatchResultWithPostInfo
+		// 	Ok(())
+		// }
 	}
 }
 

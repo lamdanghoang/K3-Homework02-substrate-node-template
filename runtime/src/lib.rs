@@ -286,7 +286,7 @@ parameter_types! {
 }
 
 parameter_types! {
-	pub const KittiesLimit: u32 = 1000;
+	pub const KittiesLimit: u32 = 10;
 }
 
 /// Configure the pallet-kitties in pallets/kitties.
@@ -371,7 +371,8 @@ mod benches {
 		[frame_system, SystemBench::<Runtime>]
 		[pallet_balances, Balances]
 		[pallet_timestamp, Timestamp]
-		[pallet_template, TemplateModule]
+		// [pallet_template, TemplateModule]
+		[pallet_kitties, Kitties]
 	);
 }
 

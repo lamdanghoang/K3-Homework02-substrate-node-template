@@ -5,11 +5,11 @@
 /// <https://docs.substrate.io/v3/runtime/frame>
 pub use pallet::*;
 
-// #[cfg(test)]
-// mod mock;
+#[cfg(test)]
+mod mock;
 
-// #[cfg(test)]
-// mod tests;
+#[cfg(test)]
+mod tests;
 
 // #[cfg(feature = "runtime-benchmarks")]
 // mod benchmarking;
@@ -27,15 +27,26 @@ pub mod pallet {
 	#[derive(TypeInfo, Default, Decode, Encode)]
 	#[scale_info(skip_type_params(T))]
 	pub struct Students<T: Config> {
-		name: Vec<u8>,
-		age: u8,
-		gender: Gender,
-		account: T::AccountId,
+		pub name: Vec<u8>,
+		pub age: u8,
+		pub gender: Gender,
+		pub account: T::AccountId,
+	}
+
+	impl<T: Config> fmt::Debug for Students<T> {
+		fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+			f.debug_struct("Students")
+				.field("name", &self.name)
+				.field("age", &self.age)
+				.field("gender", &self.gender)
+				.field("account", &self.account)
+				.finish()
+		}
 	}
 
 	pub type Id = u32;
 
-	#[derive(TypeInfo, Decode, Encode)]
+	#[derive(TypeInfo, Decode, Encode, Debug, Clone, PartialEq)]
 	pub enum Gender {
 		Male,
 		Female,
@@ -109,11 +120,16 @@ pub mod pallet {
 
 			let gender = Self::gen_gender(name.clone())?;
 
-			let student = Students { name: name.clone(), age, gender, account: who };
+			let student =
+				Students { name: name.clone(), age, gender: gender.clone(), account: who };
 
 			// let current_id = Self::student_id();
 			// let current_id = StudentId::<T>::get();
 			let mut current_id = <StudentId<T>>::get();
+
+			log::info!("Current id: {}", current_id);
+			log::info!("Gender: {:?}", gender);
+			log::warn!("Student: {:?}", &student);
 
 			// Student::<T>::insert(current_id, student);
 			<Student<T>>::insert(current_id, student);
