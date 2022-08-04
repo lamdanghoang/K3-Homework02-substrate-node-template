@@ -151,6 +151,38 @@ pub mod pallet {
 		DuplicateKitty,
 	}
 
+	#[pallet::genesis_config]
+	pub struct GenesisConfig<T: Config> {
+		pub kitties: Vec<(T::AccountId, Vec<u8>)>,
+	}
+
+	#[cfg(feature = "std")]
+	impl<T: Config> Default for GenesisConfig<T> {
+		fn default() -> GenesisConfig<T> {
+			GenesisConfig { kitties: Vec::default() }
+		}
+	}
+
+	#[pallet::genesis_build]
+	impl<T: Config> GenesisBuild<T> for GenesisConfig<T> {
+		fn build(&self) {
+			NumberKitties::<T>::put(self.kitties.len() as u32);
+			for (owner, kitty) in self.kitties.iter() {
+				let mut kitties_owned = Owner::<T>::get(owner).unwrap_or_default();
+				kitties_owned.try_push(kitty.clone()).unwrap();
+				Owner::<T>::insert(owner, kitties_owned);
+				let item = Kitty::<T> {
+					dna: kitty.clone(),
+					owner: owner.clone(),
+					price: 0u32.into(),
+					gender: Pallet::<T>::get_gender(kitty.clone()).unwrap(),
+					created_date: T::Time::now(),
+				};
+				Kitties::<T>::insert(kitty, item);
+			}
+		}
+	}
+
 	// Dispatchable functions allows users to interact with the pallet and invoke state changes.
 	// These functions materialize as "extrinsics", which are often compared to transactions.
 	// Dispatchable functions must be annotated with a weight and must return a DispatchResult.

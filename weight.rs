@@ -35,14 +35,14 @@ impl<T: frame_system::Config> pallet_kitties::WeightInfo for WeightInfo<T> {
 	// Storage: Kitties Kitties (r:1 w:1)
 	// Storage: Kitties NumberKitties (r:1 w:1)
 	fn create_kitty() -> Weight {
-		(28_811_000 as Weight)
+		(29_930_000 as Weight)
 			.saturating_add(T::DbWeight::get().reads(4 as Weight))
 			.saturating_add(T::DbWeight::get().writes(3 as Weight))
 	}
 	// Storage: Kitties Owner (r:2 w:2)
 	// Storage: Kitties Kitties (r:1 w:1)
 	fn transfer_kitty() -> Weight {
-		(22_683_000 as Weight)
+		(21_952_000 as Weight)
 			.saturating_add(T::DbWeight::get().reads(3 as Weight))
 			.saturating_add(T::DbWeight::get().writes(3 as Weight))
 	}
